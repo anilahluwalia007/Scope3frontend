@@ -1,0 +1,67 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Scope 3 Emissions Calculator</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f5f9fc; color: #333; }
+    select, input { margin: 5px; padding: 8px; width: 300px; }
+    button { padding: 10px 20px; background-color: #28a745; color: white; border: none; }
+    .results { margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h1>Scope 3 Emissions Calculator</h1>
+  <label for="activity">Select Activity:</label><br>
+  <select id="activityDropdown"></select><br>
+
+  <label>CO₂ (kg):</label><br>
+  <input type="number" id="co2Input"><br>
+
+  <label>CH₄ (kg):</label><br>
+  <input type="number" id="ch4Input"><br>
+
+  <label>N₂O (kg):</label><br>
+  <input type="number" id="n2oInput"><br>
+
+  <button onclick="calculate()">Calculate Scope 3 Emissions</button>
+
+  <div class="results" id="resultBox"></div>
+
+  <script>
+    async function fetchData() {
+      const res = await fetch("https://scope3-backend.onrender.com/activities");
+      const data = await res.json();
+      const dropdown = document.getElementById("activityDropdown");
+
+      data.forEach((item, index) => {
+        let option = document.createElement("option");
+        option.value = index;
+        option.text = item.Activity;
+        dropdown.add(option);
+      });
+
+      dropdown.onchange = () => {
+        const selected = data[dropdown.value];
+        document.getElementById("co2Input").value = selected.CO2_kg;
+        document.getElementById("ch4Input").value = selected.CH4_kg;
+        document.getElementById("n2oInput").value = selected.N2O_kg;
+      };
+
+      dropdown.dispatchEvent(new Event('change'));
+    }
+
+    function calculate() {
+      const co2 = parseFloat(document.getElementById("co2Input").value);
+      const ch4 = parseFloat(document.getElementById("ch4Input").value);
+      const n2o = parseFloat(document.getElementById("n2oInput").value);
+      const totalCO2e = co2 + (ch4 * 25) + (n2o * 298); // GWP factors
+      document.getElementById("resultBox").innerHTML = `<h3>Total CO₂e: ${totalCO2e.toFixed(2)} kg</h3>`;
+    }
+
+    fetchData();
+  </script>
+</body>
+</html>
