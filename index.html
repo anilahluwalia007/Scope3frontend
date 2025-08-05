@@ -1,67 +1,215 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Scope 3 Emissions Calculator</title>
-  <style>
-    body { font-family: Arial, sans-serif; padding: 20px; background: #f5f9fc; color: #333; }
-    select, input { margin: 5px; padding: 8px; width: 300px; }
-    button { padding: 10px 20px; background-color: #28a745; color: white; border: none; }
-    .results { margin-top: 20px; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scope 3 Emissions Calculator</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-  <h1>Scope 3 Emissions Calculator</h1>
-  <label for="activity">Select Activity:</label><br>
-  <select id="activityDropdown"></select><br>
-
-  <label>CO₂ (kg):</label><br>
-  <input type="number" id="co2Input"><br>
-
-  <label>CH₄ (kg):</label><br>
-  <input type="number" id="ch4Input"><br>
-
-  <label>N₂O (kg):</label><br>
-  <input type="number" id="n2oInput"><br>
-
-  <button onclick="calculate()">Calculate Scope 3 Emissions</button>
-
-  <div class="results" id="resultBox"></div>
-
-  <script>
-    async function fetchData() {
-      const res = await fetch("https://scope3backend.onrender.com/activities");
-      const data = await res.json();
-      const dropdown = document.getElementById("activityDropdown");
-
-      data.forEach((item, index) => {
-        let option = document.createElement("option");
-        option.value = index;
-        option.text = item.Activity;
-        dropdown.add(option);
-      });
-
-      dropdown.onchange = () => {
-        const selected = data[dropdown.value];
-        document.getElementById("co2Input").value = selected.CO2_kg;
-        document.getElementById("ch4Input").value = selected.CH4_kg;
-        document.getElementById("n2oInput").value = selected.N2O_kg;
-      };
-
-      dropdown.dispatchEvent(new Event('change'));
-    }
-
-    function calculate() {
-      const co2 = parseFloat(document.getElementById("co2Input").value);
-      const ch4 = parseFloat(document.getElementById("ch4Input").value);
-      const n2o = parseFloat(document.getElementById("n2oInput").value);
-      const totalCO2e = co2 + (ch4 * 25) + (n2o * 298); // GWP factors
-      document.getElementById("resultBox").innerHTML = `<h3>Total CO₂e: ${totalCO2e.toFixed(2)} kg</h3>`;
-    }
-
-    fetchData();
-  </script>
+    <div class="container">
+        <h1>Scope 3 Emissions Calculator</h1>
+        
+        <div class="input-section">
+            <div class="activity-selector">
+                <select id="activityDropdown">
+                    <option value="">Select Industrial Activity</option>
+                </select>
+                <button id="addActivity">Add Activity</button>
+            </div>
+            
+            <div class="activity-table">
+                <table id="activitiesTable">
+                    <thead>
+                        <tr>
+                            <th>Activity</th>
+                            <th>Quantity</th>
+                            <th>Unit</th>
+                            <th>CO2 Factor</th>
+                            <th>CH4 Factor</th>
+                            <th>N2O Factor</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+        
+        <div class="calculation-section">
+            <button id="calculateBtn">Calculate Scope 3 Emissions</button>
+            <div id="resultsContainer">
+                <h2>Results: <span id="totalCO2e">0</span> kg CO2e</h2>
+                <div id="breakdownResults"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const activityDropdown = document.getElementById('activityDropdown');
+            const activitiesTable = document.querySelector('#activitiesTable tbody');
+            const addActivityBtn = document.getElementById('addActivity');
+            const calculateBtn = document.getElementById('calculateBtn');
+            const totalCO2e = document.getElementById('totalCO2e');
+            const breakdownResults = document.getElementById('breakdownResults');
+            
+            let activities = [];
+            let selectedActivities = [];
+            
+            // Load activities from backend
+            fetch('/api/activities')
+                .then(res => res.json())
+                .then(data => {
+                    activities = data;
+                    populateActivityDropdown();
+                });
+            
+            function populateActivityDropdown() {
+                activities.forEach(activity => {
+                    const option = document.createElement('option');
+                    option.value = activity.id;
+                    option.textContent = `${activity.name} (${activity.unit})`;
+                    activityDropdown.appendChild(option);
+                });
+            }
+            
+            addActivityBtn.addEventListener('click', () => {
+                const activityId = parseInt(activityDropdown.value);
+                if (!activityId) return;
+                
+                const activity = activities.find(a => a.id === activityId);
+                if (!selectedActivities.some(a => a.id === activityId)) {
+                    selectedActivities.push({
+                        ...activity,
+                        quantity: 1,
+                        co2: activity.co2,
+                        ch4: activity.ch4,
+                        n2o: activity.n2o
+                    });
+                    renderActivitiesTable();
+                }
+            });
+            
+            function renderActivitiesTable() {
+                activitiesTable.innerHTML = '';
+                selectedActivities.forEach(activity => {
+                    const row = document.createElement('tr');
+                    row.className = 'activity-row';
+                    row.innerHTML = `
+                        <td>${activity.name}</td>
+                        <td>
+                            <input type="number" min="0" step="any" 
+                                value="${activity.quantity}" 
+                                data-id="${activity.id}" 
+                                class="quantity-input">
+                        </td>
+                        <td>${activity.unit}</td>
+                        <td>
+                            <input type="number" min="0" step="any" 
+                                value="${activity.co2}" 
+                                data-id="${activity.id}" 
+                                data-type="co2" 
+                                class="factor-input">
+                        </td>
+                        <td>
+                            <input type="number" min="0" step="any" 
+                                value="${activity.ch4}" 
+                                data-id="${activity.id}" 
+                                data-type="ch4" 
+                                class="factor-input">
+                        </td>
+                        <td>
+                            <input type="number" min="0" step="any" 
+                                value="${activity.n2o}" 
+                                data-id="${activity.id}" 
+                                data-type="n2o" 
+                                class="factor-input">
+                        </td>
+                        <td>
+                            <button class="remove-btn" data-id="${activity.id}">Remove</button>
+                        </td>
+                    `;
+                    activitiesTable.appendChild(row);
+                });
+                
+                // Add event listeners
+                document.querySelectorAll('.quantity-input').forEach(input => {
+                    input.addEventListener('change', updateActivityValue);
+                });
+                
+                document.querySelectorAll('.factor-input').forEach(input => {
+                    input.addEventListener('change', updateActivityValue);
+                });
+                
+                document.querySelectorAll('.remove-btn').forEach(button => {
+                    button.addEventListener('click', removeActivity);
+                });
+            }
+            
+            function updateActivityValue(e) {
+                const id = parseInt(e.target.dataset.id);
+                const type = e.target.dataset.type || 'quantity';
+                const value = parseFloat(e.target.value);
+                
+                selectedActivities = selectedActivities.map(activity => 
+                    activity.id === id ? {...activity, [type]: value} : activity
+                );
+            }
+            
+            function removeActivity(e) {
+                const id = parseInt(e.target.dataset.id);
+                selectedActivities = selectedActivities.filter(a => a.id !== id);
+                renderActivitiesTable();
+            }
+            
+            calculateBtn.addEventListener('click', () => {
+                if (selectedActivities.length === 0) return;
+                
+                fetch('/api/calculate', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify(selectedActivities)
+                })
+                .then(res => res.json())
+                .then(data => {
+                    totalCO2e.textContent = data.total_co2e;
+                    renderResults(data.breakdown);
+                });
+            });
+            
+            function renderResults(breakdown) {
+                breakdownResults.innerHTML = '';
+                const table = document.createElement('table');
+                table.innerHTML = `
+                    <thead>
+                        <tr>
+                            <th>Activity</th>
+                            <th>CO2e (kg)</th>
+                            <th>CO2 (kg)</th>
+                            <th>CH4 (kg)</th>
+                            <th>N2O (kg)</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                `;
+                
+                const tbody = table.querySelector('tbody');
+                breakdown.forEach(item => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${item.name}</td>
+                        <td>${item.co2e}</td>
+                        <td>${item.details.co2_kg}</td>
+                        <td>${item.details.ch4_kg}</td>
+                        <td>${item.details.n2o_kg}</td>
+                    `;
+                    tbody.appendChild(row);
+                });
+                
+                breakdownResults.appendChild(table);
+            }
+        });
+    </script>
 </body>
 </html>
