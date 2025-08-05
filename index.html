@@ -1,11 +1,188 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Scope 3 Emissions Calculator</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f7fa;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 25px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.08);
+        }
+        
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 15px;
+        }
+        
+        .input-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .activity-selector {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+            align-items: center;
+        }
+        
+        select {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 16px;
+            background: white;
+        }
+        
+        button {
+            padding: 12px 20px;
+            background: #3498db;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #2980b9;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+            background: white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #e1e1e1;
+        }
+        
+        th {
+            background-color: #3498db;
+            color: white;
+            font-weight: 600;
+        }
+        
+        tr:nth-child(even) {
+            background-color: #f8f9fa;
+        }
+        
+        tr:hover {
+            background-color: #e3f2fd;
+        }
+        
+        input[type="number"] {
+            width: 80px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .remove-btn {
+            background: #e74c3c;
+            padding: 8px 12px;
+        }
+        
+        .remove-btn:hover {
+            background: #c0392b;
+        }
+        
+        .calculation-section {
+            text-align: center;
+            padding: 25px;
+            background: #e8f4f8;
+            border-radius: 8px;
+        }
+        
+        #calculateBtn {
+            background: #27ae60;
+            padding: 15px 30px;
+            font-size: 18px;
+            margin-bottom: 25px;
+        }
+        
+        #calculateBtn:hover {
+            background: #219653;
+        }
+        
+        #resultsContainer {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            margin-top: 20px;
+        }
+        
+        #totalCO2e {
+            color: #e74c3c;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        
+        .results-table {
+            width: 100%;
+            margin-top: 20px;
+            border-collapse: collapse;
+        }
+        
+        .results-table th {
+            background-color: #2c3e50;
+        }
+        
+        .action-cell {
+            display: flex;
+            justify-content: center;
+        }
+        
+        @media (max-width: 768px) {
+            .activity-selector {
+                flex-direction: column;
+            }
+            
+            select, button {
+                width: 100%;
+            }
+            
+            .container {
+                padding: 15px;
+            }
+            
+            table {
+                font-size: 14px;
+            }
+            
+            th, td {
+                padding: 8px 10px;
+            }
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -40,7 +217,7 @@
         <div class="calculation-section">
             <button id="calculateBtn">Calculate Scope 3 Emissions</button>
             <div id="resultsContainer">
-                <h2>Results: <span id="totalCO2e">0</span> kg CO2e</h2>
+                <h2>Total Emissions: <span id="totalCO2e">0</span> kg CO2e</h2>
                 <div id="breakdownResults"></div>
             </div>
         </div>
@@ -64,6 +241,10 @@
                 .then(data => {
                     activities = data;
                     populateActivityDropdown();
+                })
+                .catch(error => {
+                    console.error('Error loading activities:', error);
+                    alert('Failed to load activities. Please try again later.');
                 });
             
             function populateActivityDropdown() {
@@ -77,7 +258,10 @@
             
             addActivityBtn.addEventListener('click', () => {
                 const activityId = parseInt(activityDropdown.value);
-                if (!activityId) return;
+                if (!activityId) {
+                    alert('Please select an activity first');
+                    return;
+                }
                 
                 const activity = activities.find(a => a.id === activityId);
                 if (!selectedActivities.some(a => a.id === activityId)) {
@@ -89,14 +273,23 @@
                         n2o: activity.n2o
                     });
                     renderActivitiesTable();
+                } else {
+                    alert('This activity is already added');
                 }
             });
             
             function renderActivitiesTable() {
                 activitiesTable.innerHTML = '';
+                
+                if (selectedActivities.length === 0) {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `<td colspan="7" style="text-align: center; padding: 20px;">No activities added yet</td>`;
+                    activitiesTable.appendChild(row);
+                    return;
+                }
+                
                 selectedActivities.forEach(activity => {
                     const row = document.createElement('tr');
-                    row.className = 'activity-row';
                     row.innerHTML = `
                         <td>${activity.name}</td>
                         <td>
@@ -127,7 +320,7 @@
                                 data-type="n2o" 
                                 class="factor-input">
                         </td>
-                        <td>
+                        <td class="action-cell">
                             <button class="remove-btn" data-id="${activity.id}">Remove</button>
                         </td>
                     `;
@@ -153,6 +346,12 @@
                 const type = e.target.dataset.type || 'quantity';
                 const value = parseFloat(e.target.value);
                 
+                if (isNaN(value) || value < 0) {
+                    alert('Please enter a valid positive number');
+                    e.target.value = selectedActivities.find(a => a.id === id)[type];
+                    return;
+                }
+                
                 selectedActivities = selectedActivities.map(activity => 
                     activity.id === id ? {...activity, [type]: value} : activity
                 );
@@ -165,23 +364,47 @@
             }
             
             calculateBtn.addEventListener('click', () => {
-                if (selectedActivities.length === 0) return;
+                if (selectedActivities.length === 0) {
+                    alert('Please add at least one activity');
+                    return;
+                }
+                
+                // Show loading state
+                calculateBtn.textContent = 'Calculating...';
+                calculateBtn.disabled = true;
                 
                 fetch('/api/calculate', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify(selectedActivities)
                 })
-                .then(res => res.json())
+                .then(res => {
+                    if (!res.ok) throw new Error('Calculation failed');
+                    return res.json();
+                })
                 .then(data => {
-                    totalCO2e.textContent = data.total_co2e;
+                    totalCO2e.textContent = data.total_co2e.toLocaleString();
                     renderResults(data.breakdown);
+                })
+                .catch(error => {
+                    console.error('Calculation error:', error);
+                    alert('Error calculating emissions. Please check your inputs and try again.');
+                })
+                .finally(() => {
+                    calculateBtn.textContent = 'Calculate Scope 3 Emissions';
+                    calculateBtn.disabled = false;
                 });
             });
             
             function renderResults(breakdown) {
+                if (breakdown.length === 0) {
+                    breakdownResults.innerHTML = '<p>No results to display</p>';
+                    return;
+                }
+                
                 breakdownResults.innerHTML = '';
                 const table = document.createElement('table');
+                table.className = 'results-table';
                 table.innerHTML = `
                     <thead>
                         <tr>
@@ -200,16 +423,19 @@
                     const row = document.createElement('tr');
                     row.innerHTML = `
                         <td>${item.name}</td>
-                        <td>${item.co2e}</td>
-                        <td>${item.details.co2_kg}</td>
-                        <td>${item.details.ch4_kg}</td>
-                        <td>${item.details.n2o_kg}</td>
+                        <td>${item.co2e.toLocaleString()}</td>
+                        <td>${item.details.co2_kg.toLocaleString()}</td>
+                        <td>${item.details.ch4_kg.toFixed(4)}</td>
+                        <td>${item.details.n2o_kg.toFixed(5)}</td>
                     `;
                     tbody.appendChild(row);
                 });
                 
                 breakdownResults.appendChild(table);
             }
+            
+            // Initialize empty table
+            renderActivitiesTable();
         });
     </script>
 </body>
